@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGV Robot Integration Master</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#0a0e17',
+                            panel: '#111827',
+                            border: '#1f293d',
+                            cyan: '#00f0ff',
+                            orange: '#ff6b00',
+                            green: '#00ff66',
+                            red: '#ff0055',
+                            yellow: '#ffb700',
+                            purple: '#9d00ff'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Sarabun', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sarabun:wght@300;400;600;700&display=swap');
+        
+        body {
+            background-color: #0a0e17;
+            color: #e2e8f0;
+            font-family: 'Sarabun', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .cyber-grid {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+        }
+
+        .cyber-box {
+            background: rgba(17, 24, 39, 0.85);
+            border: 1px solid #1f293d;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+        }
+
+        .cyber-box-glow {
+            border-color: #00f0ff;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+        }
+
+        .glow-cyan { text-shadow: 0 0 8px rgba(0, 240, 255, 0.6); }
+        .glow-orange { text-shadow: 0 0 8px rgba(ff, 107, 0, 0.6); }
+        .glow-green { text-shadow: 0 0 8px rgba(0, 255, 102, 0.6); }
+
+        .connection-line {
+            stroke-dasharray: 8, 8;
+            animation: dash 1.5s linear infinite;
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -16; }
+        }
+
+        /* Tooltip animation */
+        .tooltip-box {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+        .has-tooltip:hover .tooltip-box {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Pulse animation */
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.98); }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col cyber-grid relative selection:bg-cyber-cyan selection:text-black">
+
+    <!-- TOP NAVIGATION & STATUS BAR -->
+    <header class="cyber-box sticky top-0 z-30 border-b border-cyber-border px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <!-- Game Title -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan flex items-center justify-center text-cyber-cyan font-bold text-xl glow-cyan">
+                    AGV
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold font-mono text-white tracking-wider flex items-center gap-2">
+                        AGV INTEGRATION MASTER
+                        <span class="text-xs bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan px-2 py-0.5 rounded font-sans">v2.0 EdTech</span>
+                    </h1>
+                    <p class="text-xs text-gray-400">Robotics & Automation Systems Engineer Simulator</p>
+                </div>
+            </div>
+
+            <!-- Status Dashboard Counters -->
+            <div class="flex flex-wrap items-center gap-4 text-sm font-mono">
+                <!-- Budget Counter -->
+                <div class="bg-gray-900/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center gap-2">
+                    <span class="text-gray-400 text-xs">BUDGET:</span>
+                    <span id="stat-budget" class="text-cyber-green font-bold text-base glow-green">$1,200</span>
+                </div>
+
+                <!-- Performance Counter -->
+                <div class="bg-gray-900/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center gap-2">
+                    <span class="text-gray-400 text-xs">PERFORMANCE:</span>
+                    <span id="stat-performance" class="text-cyber-cyan font-bold text-base glow-cyan">0%</span>
+                </div>
+
+                <!-- Countdown Timer -->
+                <div class="bg-gray-900/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center gap-2">
+                    <span class="text-gray-400 text-xs">TIMER:</span>
+                    <span id="stat-timer" class="text-cyber-orange font-bold text-base glow-orange">10:00</span>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-2">
+                    <button id="btn-glossary" onclick="openGlossaryModal()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-cyber-cyan border border-cyber-cyan/40 rounded text-xs font-sans transition flex items-center gap-1">
+                        📖 คลังศัพท์
+                    </button>
+                    <button id="btn-reset" onclick="resetGame()" class="px-3 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/60 rounded text-xs font-sans transition">
+                        🔄 รีเซ็ต
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 my-2">
+        
+        <!-- LEFT & CENTER: Interactive System Integration Canvas -->
+        <div class="lg:col-span-2 flex flex-col gap-4">
+            
+            <!-- Canvas Container Header -->
+            <div class="cyber-box p-4 rounded-xl flex justify-between items-center border-l-4 border-l-cyber-cyan">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <span>🤖 System Architecture Diagram</span>
+                    </h2>
+                    <p class="text-xs text-gray-400">คลิกที่เส้นเชื่อมต่อ (<span class="text-cyber-orange font-semibold">Connection Line</span>) เพื่อเลือกโปรโตคอลการสื่อสาร</p>
+                </div>
+                <div class="text-xs bg-cyber-border px-3 py-1 rounded text-gray-300 font-mono">
+                    Connections: <span id="connected-count" class="text-cyber-cyan font-bold">0/4</span>
+                </div>
+            </div>
+
+            <!-- Interactive Diagram Box -->
+            <div class="cyber-box p-2 rounded-xl relative overflow-hidden min-h-[480px] flex items-center justify-center bg-gray-950/60 border border-cyber-border">
+                
+                <!-- SVG Connections Layer -->
+                <svg id="network-svg" class="absolute inset-0 w-full h-full z-10 pointer-events-none">
+                    <defs>
+                        <!-- Glow Filters -->
+                        <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                        <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                    </defs>
+
+                    <!-- Connection Lines (Interactive overlays rendered via JS) -->
+                    <g id="svg-lines"></g>
+                </svg>
+
+                <!-- Subsystem Nodes Container (Diamond Layout) -->
+                <div class="relative z-20 w-full h-full min-h-[440px] relative p-4 flex flex-col justify-between">
+                    
+                    <!-- Top Node: Central Fleet Manager (Node A) -->
+                    <div class="flex justify-center">
+                        <div id="node-A" class="node-card cyber-box p-3 sm:p-4 rounded-xl border border-gray-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all hover:scale-105 hover:border-cyber-cyan w-48 sm:w-56 shadow-xl">
+                            <div class="w-10 h-10 rounded-full bg-cyber-purple/20 border border-cyber-purple flex items-center justify-center mb-1 text-xl">
+                                🏢
+                            </div>
+                            <h3 class="font-bold text-xs sm:text-sm text-white">Central Fleet Manager</h3>
+                            <p class="text-[10px] sm:text-[11px] text-cyber-cyan">ระบบบริหารจัดการฝูงหุ่นยนต์</p>
+                            <span class="text-[9px] mt-1 text-gray-400 bg-gray-900 px-2 py-0.5 rounded border border-gray-800">Control Layer</span>
+                        </div>
+                    </div>
+
+                    <!-- Middle Row Nodes: Sensor Suite (Left) & Microcontroller (Right) -->
+                    <div class="flex justify-between items-center my-4 px-2 sm:px-6">
+                        <!-- Left Node: Sensor Suite (Node C) -->
+                        <div id="node-C" class="node-card cyber-box p-3 sm:p-4 rounded-xl border border-gray-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all hover:scale-105 hover:border-cyber-cyan w-44 sm:w-52 shadow-xl">
+                            <div class="w-10 h-10 rounded-full bg-cyber-green/20 border border-cyber-green flex items-center justify-center mb-1 text-xl">
+                                📡
+                            </div>
+                            <h3 class="font-bold text-xs sm:text-sm text-white">Sensor Suite (LiDAR)</h3>
+                            <p class="text-[10px] sm:text-[11px] text-cyber-cyan">ระบบตรวจจับ & หลบหลีก</p>
+                            <span class="text-[9px] mt-1 text-gray-400 bg-gray-900 px-2 py-0.5 rounded border border-gray-800">Perception Layer</span>
+                        </div>
+
+                        <!-- Right Node: Microcontroller & Motor Drive (Node B) -->
+                        <div id="node-B" class="node-card cyber-box p-3 sm:p-4 rounded-xl border border-gray-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all hover:scale-105 hover:border-cyber-cyan w-44 sm:w-52 shadow-xl">
+                            <div class="w-10 h-10 rounded-full bg-cyber-cyan/20 border border-cyber-cyan flex items-center justify-center mb-1 text-xl">
+                                ⚙️
+                            </div>
+                            <h3 class="font-bold text-xs sm:text-sm text-white">Microcontroller & Drive</h3>
+                            <p class="text-[10px] sm:text-[11px] text-cyber-cyan">ระบบควบคุมฐานล้อ/มอเตอร์</p>
+                            <span class="text-[9px] mt-1 text-gray-400 bg-gray-900 px-2 py-0.5 rounded border border-gray-800">Actuator Layer</span>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Node: Factory Warehouse Database (Node D) -->
+                    <div class="flex justify-center">
+                        <div id="node-D" class="node-card cyber-box p-3 sm:p-4 rounded-xl border border-gray-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all hover:scale-105 hover:border-cyber-cyan w-48 sm:w-56 shadow-xl">
+                            <div class="w-10 h-10 rounded-full bg-cyber-orange/20 border border-cyber-orange flex items-center justify-center mb-1 text-xl">
+                                🗄️
+                            </div>
+                            <h3 class="font-bold text-xs sm:text-sm text-white">Factory Warehouse DB</h3>
+                            <p class="text-[10px] sm:text-[11px] text-cyber-cyan">ระบบฐานข้อมูลคลังสินค้า</p>
+                            <span class="text-[9px] mt-1 text-gray-400 bg-gray-900 px-2 py-0.5 rounded border border-gray-800">Enterprise Layer</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Link Click Overlay Buttons Container -->
+                <div id="link-overlay-buttons" class="absolute inset-0 z-30 pointer-events-none"></div>
+
+            </div>
+
+            <!-- Legend and Quick Guide -->
+            <div class="cyber-box p-3 rounded-lg text-xs flex flex-wrap gap-4 items-center justify-between text-gray-400">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-cyber-cyan inline-block"></span> UART / Serial
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-cyber-green inline-block"></span> CAN Bus
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-cyber-orange inline-block"></span> Wi-Fi / MQTT
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-cyber-purple inline-block"></span> Industrial Ethernet
+                </div>
+            </div>
+
+        </div>
+
+        <div class="flex flex-col gap-4">
+            
+            <!-- Mission Controls Panel -->
+            <div class="cyber-box p-5 rounded-xl flex flex-col gap-4 border-t-4 border-t-cyber-orange">
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        🚀 Factory Mission Control
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-1">
+                        เชื่อมต่อโปรโตคอลให้ครบ 4 เส้น แล้วกดปุ่มทดสอบระบบหุ่นยนต์ในสนามจริง
+                    </p>
+                </div>
+
+                <button id="btn-run-simulation" onclick="runFactorySimulation()" disabled
+                        class="w-full py-3.5 px-4 rounded-lg font-bold font-mono text-sm tracking-wide bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700 transition flex items-center justify-center gap-2">
+                    <span>⚡ RUN FACTORY MISSION TEST</span>
+                </button>
+            </div>
+
+            <!-- Mission Waves Progress Box -->
+            <div class="cyber-box p-4 rounded-xl flex flex-col gap-3">
+                <h3 class="text-xs font-bold text-gray-300 font-mono uppercase tracking-wider flex items-center gap-2">
+                    <span>🎯 Mission Challenges (3 Waves)</span>
+                </h3>
+
+                <!-- Wave 1 Card -->
+                <div id="wave-card-1" class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex items-start gap-3 transition-all">
+                    <div id="wave-icon-1" class="w-7 h-7 rounded bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400">
+                        W1
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-gray-200">Emergency Stop & Obstacle</h4>
+                            <span id="wave-status-1" class="text-[10px] text-gray-500 font-mono">PENDING</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-0.5">การตอบสนองกะทันหันเมื่อเซนเซอร์เจอสิ่งกีดขวาง (ต้องการ Low Latency / Real-time)</p>
+                    </div>
+                </div>
+
+                <!-- Wave 2 Card -->
+                <div id="wave-card-2" class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex items-start gap-3 transition-all">
+                    <div id="wave-icon-2" class="w-7 h-7 rounded bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400">
+                        W2
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-gray-200">Fleet Mission Update</h4>
+                            <span id="wave-status-2" class="text-[10px] text-gray-500 font-mono">PENDING</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-0.5">รับคำสั่งไร้สายจากส่วนกลางแบบ Event-driven (ทนต่อสัญญาณหลุดรอดได้)</p>
+                    </div>
+                </div>
+
+                <!-- Wave 3 Card -->
+                <div id="wave-card-3" class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex items-start gap-3 transition-all">
+                    <div id="wave-icon-3" class="w-7 h-7 rounded bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400">
+                        W3
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-gray-200">Map & Vision Data Transfer</h4>
+                            <span id="wave-status-3" class="text-[10px] text-gray-500 font-mono">PENDING</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-0.5">ส่งข้อมูลภาพและแผนที่ความละเอียดสูงเข้าคลัง (ต้องการ High Bandwidth)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Configuration Summary -->
+            <div class="cyber-box p-4 rounded-xl flex flex-col gap-2">
+                <h3 class="text-xs font-bold text-gray-300 font-mono uppercase tracking-wider">
+                    📋 Active Protocol Configurations
+                </h3>
+                <div id="active-protocols-list" class="text-xs space-y-1.5 mt-1">
+                    <!-- Populated dynamically via JS -->
+                    <div class="text-gray-500 italic">ยังไม่มีการเลือกโปรโตคอล</div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- MODAL: Protocol Selection -->
+    <div id="modal-protocol" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="cyber-box max-w-2xl w-full p-6 rounded-2xl border-2 border-cyber-cyan shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button onclick="closeProtocolModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl font-bold">✕</button>
+
+            <div class="mb-4">
+                <span id="modal-link-subtitle" class="text-xs font-mono text-cyber-cyan font-semibold uppercase">Link Integration</span>
+                <h2 id="modal-link-title" class="text-xl font-bold text-white">เลือก Communication Protocol</h2>
+                <p id="modal-link-desc" class="text-xs text-gray-400 mt-1">เลือกเทคโนโลยีการสื่อสารที่เหมาะสมที่สุดสำหรับคู่นี้</p>
+            </div>
+
+            <!-- Protocols Options Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 my-4">
+                
+                <!-- Option 1: UART / Serial -->
+                <div onclick="selectProtocol('uart')" class="p-4 rounded-xl border border-gray-800 bg-gray-900/80 hover:border-cyber-cyan hover:bg-gray-800/80 cursor-pointer transition flex flex-col justify-between group">
+                    <div>
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-bold text-sm text-cyber-cyan group-hover:glow-cyan">UART / Serial Bus</h4>
+                            <span class="text-xs font-mono font-bold text-cyber-green">$100</span>
+                        </div>
+                        <p class="text-xs text-gray-300">Point-to-Point Hardware Serial</p>
+                        <div class="mt-2 text-[11px] text-gray-400 space-y-0.5">
+                            <div>• ⚡ Latency: <span class="text-cyber-green">Very Low ( Real-time )</span></div>
+                            <div>• 📶 Bandwidth: <span class="text-cyber-red">Low ( ~115.2 kbps )</span></div>
+                            <div>• 📏 Distance: <span class="text-cyber-red">Short (&lt; 15m)</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-[10px] text-cyber-cyan/80 bg-cyber-cyan/10 p-1.5 rounded border border-cyber-cyan/20">
+                        💡 เหมาะเชื่อมต่อไมโครคอนโทรลเลอร์กับเซนเซอร์เดี่ยว
+                    </div>
+                </div>
+
+                <!-- Option 2: CAN Bus -->
+                <div onclick="selectProtocol('can')" class="p-4 rounded-xl border border-gray-800 bg-gray-900/80 hover:border-cyber-green hover:bg-gray-800/80 cursor-pointer transition flex flex-col justify-between group">
+                    <div>
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-bold text-sm text-cyber-green group-hover:glow-green">CAN Bus</h4>
+                            <span class="text-xs font-mono font-bold text-cyber-green">$200</span>
+                        </div>
+                        <p class="text-xs text-gray-300">Controller Area Network</p>
+                        <div class="mt-2 text-[11px] text-gray-400 space-y-0.5">
+                            <div>• ⚡ Latency: <span class="text-cyber-green">Ultra Low ( Deterministic )</span></div>
+                            <div>• 🛡️ Fault Tolerance: <span class="text-cyber-green">High ( Industrial Safe )</span></div>
+                            <div>• 📶 Bandwidth: <span class="text-cyber-yellow">Medium ( 1 Mbps )</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-[10px] text-cyber-green/80 bg-cyber-green/10 p-1.5 rounded border border-cyber-green/20">
+                        💡 เหมาะเชื่อมต่อมอเตอร์ไดรฟ์ Hardware ภายในตัวหุ่น
+                    </div>
+                </div>
+
+                <!-- Option 3: Wi-Fi / MQTT -->
+                <div onclick="selectProtocol('mqtt')" class="p-4 rounded-xl border border-gray-800 bg-gray-900/80 hover:border-cyber-orange hover:bg-gray-800/80 cursor-pointer transition flex flex-col justify-between group">
+                    <div>
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-bold text-sm text-cyber-orange group-hover:glow-orange">Wi-Fi / MQTT</h4>
+                            <span class="text-xs font-mono font-bold text-cyber-green">$150</span>
+                        </div>
+                        <p class="text-xs text-gray-300">Wireless Pub/Sub Messaging</p>
+                        <div class="mt-2 text-[11px] text-gray-400 space-y-0.5">
+                            <div>• 📡 Wireless: <span class="text-cyber-green">Yes ( Local Wi-Fi )</span></div>
+                            <div>• ⚡ Protocol: <span class="text-cyber-cyan">Lightweight Event-Driven</span></div>
+                            <div>• ⚡ Latency: <span class="text-cyber-yellow">Medium ( Network Dependent )</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-[10px] text-cyber-orange/80 bg-cyber-orange/10 p-1.5 rounded border border-cyber-orange/20">
+                        💡 เหมาะส่งคำสั่งระหว่าง Fleet Manager กับหุ่นยนต์เคลื่อนที่
+                    </div>
+                </div>
+
+                <!-- Option 4: Industrial Ethernet / REST API -->
+                <div onclick="selectProtocol('ethernet')" class="p-4 rounded-xl border border-gray-800 bg-gray-900/80 hover:border-cyber-purple hover:bg-gray-800/80 cursor-pointer transition flex flex-col justify-between group">
+                    <div>
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-bold text-sm text-cyber-purple">Industrial Ethernet / REST API</h4>
+                            <span class="text-xs font-mono font-bold text-cyber-green">$250</span>
+                        </div>
+                        <p class="text-xs text-gray-300">High-Speed Wired / Local Network</p>
+                        <div class="mt-2 text-[11px] text-gray-400 space-y-0.5">
+                            <div>• 📶 Bandwidth: <span class="text-cyber-green">Ultra High ( 1 Gbps+ )</span></div>
+                            <div>• 📊 Data Payload: <span class="text-cyber-green">Very Large Maps & Vision</span></div>
+                            <div>• ⚡ Latency: <span class="text-cyber-cyan">Low - Medium</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-[10px] text-cyber-purple/80 bg-cyber-purple/10 p-1.5 rounded border border-cyber-purple/20">
+                        💡 เหมาะรับส่งไฟล์แผนที่ก้อนใหญ่และ Database โรงงาน
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="flex justify-end">
+                <button onclick="closeProtocolModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded font-sans">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Simulation Progress Animation & Results Debrief -->
+    <div id="modal-debrief" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="cyber-box max-w-3xl w-full p-6 rounded-2xl border-2 border-cyber-orange shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            
+            <div id="debrief-header" class="text-center border-b border-gray-800 pb-4 mb-4">
+                <span class="text-xs font-mono text-cyber-orange tracking-widest uppercase">Factory Test Debrief Report</span>
+                <h2 id="debrief-title" class="text-2xl font-bold text-white mt-1">กำลังทดสอบภารกิจหุ่นยนต์...</h2>
+                <div id="debrief-score-badge" class="hidden mt-3 inline-flex items-center gap-2 bg-cyber-cyan/10 border border-cyber-cyan px-4 py-1.5 rounded-full">
+                    <span class="text-xs text-cyber-cyan font-mono">FINAL SCORE:</span>
+                    <span id="debrief-final-score" class="text-2xl font-bold text-white font-mono">0%</span>
+                </div>
+            </div>
+
+            <!-- Wave Execution Logs Area -->
+            <div id="simulation-logs-container" class="space-y-4 my-4 font-mono text-xs">
+                <!-- Logs will be appended via JS during simulation -->
+            </div>
+
+            <!-- Educational Debriefing Notes Section (Visible after simulation) -->
+            <div id="debrief-educational-notes" class="hidden border-t border-gray-800 pt-4 mt-6">
+                <h3 class="text-sm font-bold text-cyber-cyan flex items-center gap-2 mb-3 font-sans">
+                    🎓 บทเรียนสถาปัตยกรรมระบบหุ่นยนต์ (System Integration Debrief)
+                </h3>
+                <div id="debrief-feedback-list" class="space-y-2 text-xs text-gray-300 font-sans leading-relaxed">
+                    <!-- Educational feedback inserted dynamically -->
+                </div>
+            </div>
+
+            <!-- Modal Action Footer -->
+            <div class="mt-6 flex justify-between items-center border-t border-gray-800 pt-4">
+                <span class="text-xs text-gray-500 font-mono">AGV Integration Training Module</span>
+                <button id="btn-close-debrief" onclick="closeDebriefModal()" class="px-5 py-2.5 bg-cyber-cyan text-black font-bold text-xs rounded-lg hover:bg-cyan-300 transition">
+                    ตกลง / ลองใหม่อีกครั้ง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Technical Glossary & Knowledge Base -->
+    <div id="modal-glossary" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="cyber-box max-w-3xl w-full p-6 rounded-2xl border border-cyber-cyan shadow-2xl relative max-h-[85vh] overflow-y-auto">
+            <button onclick="closeGlossaryModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl font-bold">✕</button>
+
+            <h2 class="text-xl font-bold text-white mb-1 flex items-center gap-2">
+                📖 คลังคำศัพท์ & ทฤษฎี Automation Integration
+            </h2>
+            <p class="text-xs text-gray-400 mb-4">คู่มือความรู้พื้นฐานสำหรับนักเรียนมัธยมศึกษาในการเลือกใช้โปรโตคอลการสื่อสาร</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                
+                <div class="bg-gray-900/80 p-3.5 rounded-xl border border-gray-800">
+                    <h3 class="font-bold text-cyber-cyan mb-1 text-sm">⚡ Latency (ความหน่วงเวลา)</h3>
+                    <p class="text-gray-300">ระยะเวลาตั้งแต่ส่งข้อมูลจนถึงผู้รับ หากมีค่าต่ำ (Low Latency) ข้อมูลจะถึงทันที ซึ่งจำเป็นมากสำหรับระบบความปลอดภัย เช่น การกดปุ่ม Emergency Stop หรือการเบรกหลบสิ่งกีดขวาง</p>
+                </div>
+
+                <div class="bg-gray-900/80 p-3.5 rounded-xl border border-gray-800">
+                    <h3 class="font-bold text-cyber-cyan mb-1 text-sm">📶 Bandwidth (ความกว้างช่องสัญญาณ)</h3>
+                    <p class="text-gray-300">ปริมาณข้อมูลที่ส่งได้ต่อวินาที หากต้องส่งไฟล์รูปภาพ HD หรือแผนที่ 2D/3D LiDAR จะต้องใช้โปรโตคอลที่มี Bandwidth สูง เช่น Industrial Ethernet</p>
+                </div>
+
+                <div class="bg-gray-900/80 p-3.5 rounded-xl border border-gray-800">
+                    <h3 class="font-bold text-cyber-green mb-1 text-sm">🛡️ CAN Bus (Controller Area Network)</h3>
+                    <p class="text-gray-300">มาตรฐานการสื่อสารระดับฮาร์ดแวร์ในอุตสาหกรรมและยานยนต์ มีความทนทานสูง ป้องกันสัญญาณรบกวน เหมาะสำหรับการรับส่งคำสั่งควบคุมมอเตอร์และเบรกแบบ Real-time</p>
+                </div>
+
+                <div class="bg-gray-900/80 p-3.5 rounded-xl border border-gray-800">
+                    <h3 class="font-bold text-cyber-orange mb-1 text-sm">📡 MQTT / Wi-Fi Protocol</h3>
+                    <p class="text-gray-300">โปรโตคอลการสื่อสารไร้สายแบบ Publish/Subscribe น้ำหนักเบา ทนต่อกรณีสัญญาณ Wi-Fi หลุดเป็นพักๆ เหมาะสำหรับหุ่นยนต์เคลื่อนที่ (AGV/AMR) ที่ส่งสถานะไปยัง Fleet Server</p>
+                </div>
+
+                <div class="bg-gray-900/80 p-3.5 rounded-xl border border-gray-800">
+                    <h3 class="font-bold text-cyber-purple mb-1 text-sm">🌐 REST API & Industrial Ethernet</h3>
+                    <p class="text-gray-300">การเชื่อมต่อผ่านเครือข่ายความเร็วสูง เหมาะสำหรับส่งข้อมูลก้อนใหญ่ และเชื่อมต่อระหว่าง Fleet Server กับระบบฐานข้อมูลคลังสินค้าโรงงาน (WMS/ERP)</p>
+                </div>
+
+                <div class="bg-gray-900/80 p-3.5 rounded-xl border border-gray-800">
+                    <h3 class="font-bold text-cyber-yellow mb-1 text-sm">🏗️ Automation Pyramid (ปิรามิดระบบอัตโนมัติ)</h3>
+                    <p class="text-gray-300">การแบ่งชั้นของระบบอัตโนมัติจากชั้นล่างสุด (Field/Sensors) -> Control -> Fleet -> Enterprise (DB) การส่งข้อมูลข้ามชั้นต้องเลือกสายและโปรโตคอลให้เหมาะสม</p>
+                </div>
+
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeGlossaryModal()" class="px-4 py-2 bg-cyber-cyan text-black font-bold text-xs rounded hover:bg-cyan-300 transition">เข้าใจแล้ว</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================================================
+           GAME STATE & ARCHITECTURE DATA STRUCTURES
+           ========================================================================== */
+        
+        // Initial Constants
+        const INITIAL_BUDGET = 1200;
+        const TIMER_INITIAL_SECONDS = 600; // 10 minutes
+
+        // Game State Variable
+        let gameState = {
+            budget: INITIAL_BUDGET,
+            performance: 0,
+            timerSeconds: TIMER_INITIAL_SECONDS,
+            timerInterval: null,
+            activeLinkModal: null,
+            connections: {
+                link_1: null, // Sensor Suite <-> Microcontroller
+                link_2: null, // Microcontroller <-> Central Fleet Manager
+                link_3: null, // Central Fleet Manager <-> Factory DB
+                link_4: null  // Sensor Suite/Microcontroller <-> Factory DB
+            }
+        };
+
+        // Network Topology Definitions (Nodes and Connections)
+        const LINKS_DEFINITION = {
+            link_1: {
+                id: 'link_1',
+                nodeA: 'node-C', // Sensor Suite
+                nodeB: 'node-B', // Microcontroller & Drive
+                title: 'Sensor Suite ↔ Microcontroller',
+                desc: 'เชื่อมต่อระหว่างเซนเซอร์วัดระยะ/LiDAR และบอร์ดประมวลผลขับมอเตอร์',
+                curveOffset: -45 // Curved path control point offset
+            },
+            link_2: {
+                id: 'link_2',
+                nodeA: 'node-A', // Central Fleet Manager
+                nodeB: 'node-B', // Microcontroller & Drive
+                title: 'Fleet Manager ↔ Microcontroller',
+                desc: 'เชื่อมต่อระหว่างตัวหุ่นยนต์เคลื่อนที่และระบบควบคุมฝูงหุ่นยนต์กลาง',
+                curveOffset: 40
+            },
+            link_3: {
+                id: 'link_3',
+                nodeA: 'node-A', // Central Fleet Manager
+                nodeB: 'node-D', // Factory Database
+                title: 'Fleet Manager ↔ Factory Warehouse DB',
+                desc: 'เชื่อมต่อระบบ Fleet กับฐานข้อมูลคลังสินค้าของโรงงาน',
+                curveOffset: -60
+            },
+            link_4: {
+                id: 'link_4',
+                nodeA: 'node-C', // Sensor Suite
+                nodeB: 'node-D', // Factory Database
+                title: 'Robot Vision/Sensors ↔ Factory DB',
+                desc: 'เชื่อมต่อการส่งข้อมูลแผนที่ก้อนใหญ่และภาพถ่ายของหุ่นยนต์เข้าเซิร์ฟเวอร์',
+                curveOffset: 35
+            }
+        };
+
+        // Communication Protocol Master Specifications
+        const PROTOCOLS = {
+            uart: {
+                id: 'uart',
+                name: 'UART / Serial Bus',
+                cost: 100,
+                color: '#00f0ff',
+                latency: 'low',
+                bandwidth: 'low',
+                wireless: false,
+                idealFor: ['link_1']
+            },
+            can: {
+                id: 'can',
+                name: 'CAN Bus',
+                cost: 200,
+                color: '#00ff66',
+                latency: 'ultra-low',
+                bandwidth: 'medium',
+                wireless: false,
+                idealFor: ['link_1']
+            },
+            mqtt: {
+                id: 'mqtt',
+                name: 'Wi-Fi / MQTT',
+                cost: 150,
+                color: '#ff6b00',
+                latency: 'medium',
+                bandwidth: 'medium',
+                wireless: true,
+                idealFor: ['link_2']
+            },
+            ethernet: {
+                id: 'ethernet',
+                name: 'Industrial Ethernet / REST API',
+                cost: 250,
+                color: '#9d00ff',
+                latency: 'low',
+                bandwidth: 'high',
+                wireless: false,
+                idealFor: ['link_3', 'link_4']
+            }
+        };
+
+        window.onload = function() {
+            initGame();
+            window.addEventListener('resize', drawNetworkLines);
+        };
+
+        function initGame() {
+            gameState.budget = INITIAL_BUDGET;
+            gameState.performance = 0;
+            gameState.timerSeconds = TIMER_INITIAL_SECONDS;
+            gameState.connections = { link_1: null, link_2: null, link_3: null, link_4: null };
+
+            startTimer();
+            updateUIStats();
+            drawNetworkLines();
+            updateActiveProtocolsList();
+            resetWaveCardsUI();
+        }
+
+        // Timer Logic
+        function startTimer() {
+            if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+            gameState.timerInterval = setInterval(() => {
+                if (gameState.timerSeconds > 0) {
+                    gameState.timerSeconds--;
+                    updateTimerDisplay();
+                } else {
+                    clearInterval(gameState.timerInterval);
+                    alert("⏰ หมดเวลา 10 นาทีแล้ว! กรุณาสรุปการเชื่อมต่อระบบของคุณ");
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(gameState.timerSeconds / 60);
+            const seconds = gameState.timerSeconds % 60;
+            document.getElementById('stat-timer').innerText = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function drawNetworkLines() {
+            const svgGroup = document.getElementById('svg-lines');
+            const overlayContainer = document.getElementById('link-overlay-buttons');
+            svgGroup.innerHTML = '';
+            overlayContainer.innerHTML = '';
+
+            const canvasBox = document.getElementById('network-svg').getBoundingClientRect();
+
+            Object.keys(LINKS_DEFINITION).forEach(linkKey => {
+                const link = LINKS_DEFINITION[linkKey];
+                const nodeA = document.getElementById(link.nodeA);
+                const nodeB = document.getElementById(link.nodeB);
+
+                if (!nodeA || !nodeB) return;
+
+                const rectA = nodeA.getBoundingClientRect();
+                const rectB = nodeB.getBoundingClientRect();
+
+                // Compute center coordinates relative to the SVG Canvas
+                const x1 = rectA.left + rectA.width / 2 - canvasBox.left;
+                const y1 = rectA.top + rectA.height / 2 - canvasBox.top;
+                const x2 = rectB.left + rectB.width / 2 - canvasBox.left;
+                const y2 = rectB.top + rectB.height / 2 - canvasBox.top;
+
+                // Midpoint calculation
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+
+                // Calculate Quadratic Bezier Curve Control Point (CP)
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Normal vector for curve curvature
+                const nx = -dy / dist;
+                const ny = dx / dist;
+
+                const offset = link.curveOffset || 0;
+                const controlX = midX + nx * offset;
+                const controlY = midY + ny * offset;
+
+                // Calculate button anchor position at t = 0.5 on Quadratic Bezier Curve
+                const btnX = 0.25 * x1 + 0.5 * controlX + 0.25 * x2;
+                const btnY = 0.25 * y1 + 0.5 * controlY + 0.25 * y2;
+
+                const activeProtocol = gameState.connections[linkKey];
+                const lineColor = activeProtocol ? PROTOCOLS[activeProtocol].color : '#374151';
+
+                // Create SVG Path Element (Curved Bezier Line)
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const pathData = `M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`;
+                
+                path.setAttribute('d', pathData);
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke', lineColor);
+                path.setAttribute('stroke-width', activeProtocol ? '4' : '2');
+                if (activeProtocol) {
+                    path.classList.add('connection-line');
+                } else {
+                    path.setAttribute('stroke-dasharray', '5 5');
+                }
+                svgGroup.appendChild(path);
+
+                // Create Center Overlay Interactive Button for selecting protocol
+                const btn = document.createElement('button');
+                btn.className = `absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full font-mono text-[11px] sm:text-xs font-bold border transition-all shadow-2xl flex items-center gap-1 z-30 ${
+                    activeProtocol 
+                    ? 'bg-gray-950/95 border-cyber-cyan text-cyber-cyan shadow-cyber-cyan/30 scale-105 ring-2 ring-cyber-cyan/20' 
+                    : 'bg-gray-900/95 border-gray-600 text-gray-300 hover:border-cyber-orange hover:text-cyber-orange hover:scale-110'
+                }`;
+                btn.style.left = `${btnX}px`;
+                btn.style.top = `${btnY}px`;
+                btn.onclick = () => openProtocolModal(linkKey);
+
+                btn.innerHTML = activeProtocol 
+                    ? `🔗 ${PROTOCOLS[activeProtocol].name}` 
+                    : `➕ ${linkKey.replace('link_', 'Link ')}`;
+
+                overlayContainer.appendChild(btn);
+            });
+        }
+
+        function openProtocolModal(linkKey) {
+            gameState.activeLinkModal = linkKey;
+            const linkDef = LINKS_DEFINITION[linkKey];
+
+            document.getElementById('modal-link-subtitle').innerText = `CONFIGURING LINK: ${linkKey.toUpperCase()}`;
+            document.getElementById('modal-link-title').innerText = linkDef.title;
+            document.getElementById('modal-link-desc').innerText = linkDef.desc;
+
+            document.getElementById('modal-protocol').classList.remove('hidden');
+        }
+
+        function closeProtocolModal() {
+            document.getElementById('modal-protocol').classList.add('hidden');
+            gameState.activeLinkModal = null;
+        }
+
+        function selectProtocol(protocolId) {
+            const linkKey = gameState.activeLinkModal;
+            if (!linkKey) return;
+
+            const selectedProtocol = PROTOCOLS[protocolId];
+            const currentProtocolId = gameState.connections[linkKey];
+
+            // Calculate cost adjustments
+            let costDifference = selectedProtocol.cost;
+            if (currentProtocolId) {
+                costDifference -= PROTOCOLS[currentProtocolId].cost;
+            }
+
+            if (gameState.budget - costDifference < 0) {
+                alert("⚠️ งบประมาณไม่เพียงพอ! กรุณาปรับเปลี่ยนโปรโตคอลอื่นก่อน");
+                return;
+            }
+
+            // Apply configuration
+            gameState.budget -= costDifference;
+            gameState.connections[linkKey] = protocolId;
+
+            closeProtocolModal();
+            updateUIStats();
+            drawNetworkLines();
+            updateActiveProtocolsList();
+            calculateInitialPerformance();
+        }
+
+        function updateUIStats() {
+            document.getElementById('stat-budget').innerText = `$${gameState.budget}`;
+            document.getElementById('stat-performance').innerText = `${gameState.performance}%`;
+
+            // Count completed connections
+            const connectedCount = Object.values(gameState.connections).filter(val => val !== null).length;
+            document.getElementById('connected-count').innerText = `${connectedCount}/4`;
+
+            const btnRun = document.getElementById('btn-run-simulation');
+            if (connectedCount === 4) {
+                btnRun.disabled = false;
+                btnRun.className = "w-full py-3.5 px-4 rounded-lg font-bold font-mono text-sm tracking-wide bg-gradient-to-r from-cyber-orange to-amber-500 hover:from-orange-500 hover:to-amber-400 text-black shadow-lg shadow-cyber-orange/20 cursor-pointer transition transform hover:scale-[1.02] flex items-center justify-center gap-2 animate-pulse-slow";
+            } else {
+                btnRun.disabled = true;
+                btnRun.className = "w-full py-3.5 px-4 rounded-lg font-bold font-mono text-sm tracking-wide bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700 transition flex items-center justify-center gap-2";
+            }
+        }
+
+        function updateActiveProtocolsList() {
+            const container = document.getElementById('active-protocols-list');
+            container.innerHTML = '';
+
+            let hasConnections = false;
+            Object.keys(gameState.connections).forEach(linkKey => {
+                const protocolId = gameState.connections[linkKey];
+                if (protocolId) {
+                    hasConnections = true;
+                    const protocol = PROTOCOLS[protocolId];
+                    const linkDef = LINKS_DEFINITION[linkKey];
+
+                    const item = document.createElement('div');
+                    item.className = "flex justify-between items-center p-2 rounded bg-gray-900 border border-gray-800";
+                    item.innerHTML = `
+                        <div>
+                            <span class="text-gray-400 font-mono text-[10px]">${linkKey.toUpperCase()}</span>
+                            <div class="font-bold text-gray-200">${linkDef.title}</div>
+                        </div>
+                        <span class="font-mono text-xs font-bold px-2 py-0.5 rounded" style="color: ${protocol.color}; border: 1px solid ${protocol.color}40; background: ${protocol.color}10;">
+                            ${protocol.name}
+                        </span>
+                    `;
+                    container.appendChild(item);
+                }
+            });
+
+            if (!hasConnections) {
+                container.innerHTML = `<div class="text-gray-500 italic">ยังไม่มีการเชื่อมต่อโปรโตคอล</div>`;
+            }
+        }
+
+        function calculateInitialPerformance() {
+            let total = 0;
+            // Estimated score preview based on ideal protocol pairings
+            if (gameState.connections.link_1 === 'can' || gameState.connections.link_1 === 'uart') total += 25;
+            if (gameState.connections.link_2 === 'mqtt') total += 25;
+            if (gameState.connections.link_3 === 'ethernet') total += 25;
+            if (gameState.connections.link_4 === 'ethernet') total += 25;
+
+            gameState.performance = total;
+            document.getElementById('stat-performance').innerText = `${gameState.performance}%`;
+        }
+
+        function runFactorySimulation() {
+            const debriefModal = document.getElementById('modal-debrief');
+            const logContainer = document.getElementById('simulation-logs-container');
+            const scoreBadge = document.getElementById('debrief-score-badge');
+            const eduNotes = document.getElementById('debrief-educational-notes');
+            const title = document.getElementById('debrief-title');
+
+            logContainer.innerHTML = '';
+            debriefModal.classList.remove('hidden');
+            scoreBadge.classList.add('hidden');
+            eduNotes.classList.add('hidden');
+            title.innerText = "กำลังจำลองสถานการณ์การทำงานของหุ่นยนต์...";
+
+            // Simulation Evaluation Pipeline
+            let wave1Pass = false;
+            let wave2Pass = false;
+            let wave3Pass = false;
+            let feedback = [];
+
+            // Wave 1 Test: Emergency Stop & Obstacle Avoidance (Sensor <-> Microcontroller)
+            const p1 = gameState.connections.link_1;
+            if (p1 === 'can') {
+                wave1Pass = true;
+                feedback.push("✅ **Wave 1 Success (CAN Bus):** CAN Bus ตอบสนองแบบ Deterministic Real-time ทำให้หุ่นยนต์หยุดกะทันหันได้ปลอดภัย ไม่ชนสิ่งกีดขวาง!");
+            } else if (p1 === 'uart') {
+                wave1Pass = true;
+                feedback.push("⚠️ **Wave 1 Pass (UART/Serial):** UART มี Latency ต่ำ หุ่นยนต์หยุดได้ทัน แต่ไม่มี Fault Tolerance ระดับอุตสาหกรรม");
+            } else {
+                wave1Pass = false;
+                feedback.push("❌ **Wave 1 Failed:** โปรโตคอลนี้มีความหน่วงเวลา (Latency) สูงเกินไป ทำให้สัญญาณ Emergency Stop ส่งไม่ทัน หุ่นยนต์ชนสิ่งกีดขวาง!");
+            }
+
+            // Wave 2 Test: Fleet Mission Update (Microcontroller <-> Fleet Manager)
+            const p2 = gameState.connections.link_2;
+            if (p2 === 'mqtt') {
+                wave2Pass = true;
+                feedback.push("✅ **Wave 2 Success (Wi-Fi / MQTT):** MQTT ส่งข้อมูลแบบ Event-driven น้ำหนักเบา แม้หุ่นยนต์จะเคลื่อนที่ผ่านจุดสัญญาณอ่อน ข้อมูลก็ไม่สูญหาย");
+            } else {
+                wave2Pass = false;
+                feedback.push("❌ **Wave 2 Failed:** การใช้โปรโตคอลมีสายหรือขาดระบบ Pub/Sub ไร้สาย ทำให้หุ่นยนต์หลุดจากการเชื่อมต่อฝูงหุ่นยนต์ (Fleet Disconnected)");
+            }
+
+            // Wave 3 Test: Map & Vision Data Transfer (Fleet <-> DB & Vision <-> DB)
+            const p3 = gameState.connections.link_3;
+            const p4 = gameState.connections.link_4;
+            if (p3 === 'ethernet' && p4 === 'ethernet') {
+                wave3Pass = true;
+                feedback.push("✅ **Wave 3 Success (Industrial Ethernet):** Bandwidth สูงระดับ Gbps สามารถส่งข้อมูลแผนที่ 2D/3D LiDAR และภาพถ่าย HD ได้รวดเร็วสมบูรณ์");
+            } else {
+                wave3Pass = false;
+                feedback.push("❌ **Wave 3 Failed:** Bandwidth ไม่เพียงพอ ทำให้ข้อมูลภาพ 3D LiDAR ค้างและส่งไม่สำเร็จเข้าสู่ Warehouse Database");
+            }
+
+            // Step-by-Step Simulated Progress Stream
+            setTimeout(() => appendLog("📡 [SYSTEM CHECK] กำลังส่งคำสั่งเริ่มต้นทดสอบไปยัง AGV Fleet...", "cyan"), 400);
+            
+            setTimeout(() => {
+                appendLog("🔥 [WAVE 1] สิ่งกีดขวางกะทันหันบนทางเดินหุ่นยนต์! ตรวจสอบ Latency สัญญาณหยุด...", "yellow");
+                updateWaveUI(1, wave1Pass);
+                appendLog(wave1Pass ? "-> [SUCCESS] Emergency Stop Signal: Received in 2ms" : "-> [FAIL] Latency Timeout! Emergency Stop Failed", wave1Pass ? "green" : "red");
+            }, 1500);
+
+            setTimeout(() => {
+                appendLog("📶 [WAVE 2] อัปเดตคำสั่งภารกิจใหม่ข้ามโซนผ่านไร้สาย...", "yellow");
+                updateWaveUI(2, wave2Pass);
+                appendLog(wave2Pass ? "-> [SUCCESS] Fleet Sync Complete via Lightweight MQTT" : "-> [FAIL] Wireless Connection Lost / Packet Dropped", wave2Pass ? "green" : "red");
+            }, 3000);
+
+            setTimeout(() => {
+                appendLog("🗄️ [WAVE 3] ส่งแผนที่ LiDAR HD 500MB เข้าฐานข้อมูลคลังสินค้า...", "yellow");
+                updateWaveUI(3, wave3Pass);
+                appendLog(wave3Pass ? "-> [SUCCESS] High Bandwidth Data Transfer Finished" : "-> [FAIL] Network Bottleneck! Data Transfer Timed Out", wave3Pass ? "green" : "red");
+            }, 4500);
+
+            // Final Debrief Output
+            setTimeout(() => {
+                let score = 0;
+                if (wave1Pass) score += 35;
+                if (wave2Pass) score += 35;
+                if (wave3Pass) score += 30;
+
+                gameState.performance = score;
+                updateUIStats();
+
+                title.innerText = "การทดสอบระบบเสร็จสิ้น (Simulation Completed)";
+                document.getElementById('debrief-final-score').innerText = `${score}%`;
+                scoreBadge.classList.remove('hidden');
+
+                // Render Educational Feedback
+                const feedbackContainer = document.getElementById('debrief-feedback-list');
+                feedbackContainer.innerHTML = feedback.map(item => `
+                    <div class="p-2.5 rounded bg-gray-900 border border-gray-800">${item}</div>
+                `).join('');
+
+                eduNotes.classList.remove('hidden');
+            }, 5500);
+        }
+
+        function appendLog(text, color) {
+            const container = document.getElementById('simulation-logs-container');
+            const el = document.createElement('div');
+            let colorClass = "text-gray-300";
+            if (color === 'cyan') colorClass = "text-cyber-cyan";
+            if (color === 'yellow') colorClass = "text-cyber-yellow";
+            if (color === 'green') colorClass = "text-cyber-green";
+            if (color === 'red') colorClass = "text-cyber-red";
+
+            el.className = `${colorClass} border-l-2 border-gray-700 pl-2 py-0.5 animate-in fade-in duration-300`;
+            el.innerText = text;
+            container.appendChild(el);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateWaveUI(waveNum, isSuccess) {
+            const card = document.getElementById(`wave-card-${waveNum}`);
+            const icon = document.getElementById(`wave-icon-${waveNum}`);
+            const status = document.getElementById(`wave-status-${waveNum}`);
+
+            if (isSuccess) {
+                card.className = "p-3 rounded-lg bg-cyber-green/10 border border-cyber-green/40 flex items-start gap-3 transition-all";
+                icon.className = "w-7 h-7 rounded bg-cyber-green/20 text-cyber-green border border-cyber-green flex items-center justify-center text-xs font-bold";
+                status.className = "text-[10px] text-cyber-green font-mono font-bold";
+                status.innerText = "PASSED";
+            } else {
+                card.className = "p-3 rounded-lg bg-cyber-red/10 border border-cyber-red/40 flex items-start gap-3 transition-all";
+                icon.className = "w-7 h-7 rounded bg-cyber-red/20 text-cyber-red border border-cyber-red flex items-center justify-center text-xs font-bold";
+                status.className = "text-[10px] text-cyber-red font-mono font-bold";
+                status.innerText = "FAILED";
+            }
+        }
+
+        function resetWaveCardsUI() {
+            [1, 2, 3].forEach(w => {
+                const card = document.getElementById(`wave-card-${w}`);
+                const icon = document.getElementById(`wave-icon-${w}`);
+                const status = document.getElementById(`wave-status-${w}`);
+
+                card.className = "p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex items-start gap-3 transition-all";
+                icon.className = "w-7 h-7 rounded bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400";
+                status.className = "text-[10px] text-gray-500 font-mono";
+                status.innerText = "PENDING";
+            });
+        }
+
+        function closeDebriefModal() {
+            document.getElementById('modal-debrief').classList.add('hidden');
+        }
+
+        function openGlossaryModal() {
+            document.getElementById('modal-glossary').classList.remove('hidden');
+        }
+
+        function closeGlossaryModal() {
+            document.getElementById('modal-glossary').classList.add('hidden');
+        }
+
+        function resetGame() {
+            if (confirm("🔄 คุณต้องการรีเซ็ตการเชื่อมต่อทั้งหมดและเริ่มใหม่หรือไม่?")) {
+                initGame();
+            }
+        }
+    </script>
+</body>
+</html>
